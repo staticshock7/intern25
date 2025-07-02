@@ -79,9 +79,30 @@ class devdev:
 
 # prints the menu for the user
 def menu1():
-    print(f"\n{MAG}{'='*30}  {'='*30}{RST}")
+    print(f"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n{MAG}{'='*30}{RST} Cable Validations {MAG}{'='*30}{RST}")
     print(f"1. Enter the device list for the POD, including routers: \nExample {YEL} LXXXXXXX BXXXXXX FXXXXXX")
     return input(">> ").split()
+
+def menu2():
+    print(f"{MAG}{"="*30}{RST} Select the port configuration! {MAG}{"="*30}{RST}")
+    print(f"\n1. Standard port configuration — LBs: eth XX; RTR-Side-LB: 1/XX-XX; RTR-Side-FW: 1/XX-XX")
+    print(f"2. Manual batch entry")
+    return input(f"{YEL}>>> ")
+
+def menu3():
+    while True:
+        val1 = menu2()
+        if val1 == "1":
+            return "XX", "1/XX-XX", "1/XXX-XX"
+        elif val1 == "2":
+            lb = input(f"{RST}1. Enter the LB port [Example: {GRN}XX{RST}]: ")
+            rtr_lb = input(f"2. Enter the Router-Side {YEL}LB{RST} ports [Example: {GRN}1/XX-XX{RST}]: ")
+            rtr_fw = input(f"3. Enter the Router-Side {YEL}FW{RST} ports [Example: {GRN}1/XX-XX{RST}]: ")
+            return lb, rtr_lb, rtr_fw
+        else:
+            print(f"Please select 1 or 2.")
+            sleep(1)
+
 # sorts then stores the devices in the instance
 def devsort():
     dev_inst = devdev()
@@ -90,15 +111,14 @@ def devsort():
     FWs = []
     RTRs = []
     for i in raw_devs:
-        if findall(r"LBE|LBC", i):
+        if findall(r"^LB.*(\d{4})$", i):
             LBs.append(i)
-        elif findall("FW", i):
+        elif findall(r"FW.*(\d{4})$", i):
             FWs.append(i)
-        elif findall(r"B\d{2}", i):
+        elif findall(r"^B(\d{2}).*$", i):
             RTRs.append(i)
         else:
             print("No input provided!")
-    print(RTRs)
     dev_inst.set_fw_list(FWs)
     dev_inst.set_lb_list(LBs)
     dev_inst.set_rtr_list(RTRs)
@@ -106,12 +126,12 @@ def devsort():
     return dev_inst
 
 
-def ssh1(dev, key1, user1, cmd1, cmd2="", cmd3=""):
+def ssh1(dev, key1, user1, cmd1, cmd2=""):
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(AutoAddPolicy())
 
     try:       
-        ssh.connect(f"{dev}.XXXX", username=user1, password=key1)
+        ssh.connect(f"{dev}.XXXX", username=user1, password=key1, banner_timeout=20)
         shell = ssh.invoke_shell()
         sleep(2)
         recv = ""
@@ -119,12 +139,9 @@ def ssh1(dev, key1, user1, cmd1, cmd2="", cmd3=""):
         sleep(1)
         shell.send(f"{cmd2}\n")
         sleep(1)
-        shell.send(f"{cmd3}\n")
-        sleep(1)
-        
-
+    
         if shell.recv_ready:
-            recv = shell.recv(1024).decode()
+            recv = shell.recv(2048).decode()
 
     except gaierror as e:
         print(f"\n{CYN}Invalid Host:{RST} {dev}. Resolution failed: {e}")
@@ -138,12 +155,12 @@ def ssh1(dev, key1, user1, cmd1, cmd2="", cmd3=""):
     return recv
 
 # lb flipflop
-def flipflop_lb(dev, key1, user1, state, int_num=""):
+def flipflop_lb(dev, key1, user1, state, eth_int=""):
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(AutoAddPolicy())
 
     try:       
-        ssh.connect(f"{dev}.XXXX", username=user1, password=key1)
+        ssh.connect(f"{dev}.XXXX", username=user1, password=key1, banner_timeout=20)
         shell = ssh.invoke_shell()
         sleep(2)
         recv = ""
@@ -152,25 +169,27 @@ def flipflop_lb(dev, key1, user1, state, int_num=""):
         if state == "up":
             shell.send("config t\n")
             sleep(1)
-            shell.send(f"interface ethernet 25\n")
+            shell.send(f"interface ethernet {eth_int}\n")
             sleep(0.5)
             shell.send("disable\n")
             sleep(1)
-            shell.send("show interface eth 25\n")
+            shell.send(f"show interface eth {eth_int}\n")
             sleep(1)
             if shell.recv_ready:
                 recv = shell.recv(2048).decode()
+            ssh.close()
         elif state == "down":
             shell.send("config t\n")
             sleep(1)
-            shell.send(f"interface ethern 25\n")
+            shell.send(f"interface ethern {eth_int}\n")
             sleep(0.5)
             shell.send("enable\n")
-            sleep(3) # longer time for interface to come up, and report correctly
-            shell.send("show interface eth 25\n")
+            sleep(4) # longer time for interface to come up, and report correctly
+            shell.send(f"show interface eth {eth_int}\n")
             sleep(1)
             if shell.recv_ready:
                 recv = shell.recv(2048).decode()
+            ssh.close()
         else:
             print(f"Unable to change interface — {YEL}Please manually verify state{RST}")
             recv = "No output received"
@@ -187,35 +206,41 @@ def flipflop_lb(dev, key1, user1, state, int_num=""):
         ssh.close()
 
 # firewall flipflop
-def flipflop_fw(dev, key1, user1, state1, state2):
+def flipflop_fw(dev, key1, user1, state1, state2, eth_int=""):
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(AutoAddPolicy())
 
     try:       
-        ssh.connect(f"{dev}.XXXX", username=user1, password=key1)
+        ssh.connect(f"{dev}.XXXX", username=user1, password=key1, banner_timeout=20)
         shell = ssh.invoke_shell()
         sleep(2)
         recv = ""
         if state1 == "on" and state2 == "up":
-            shell.send("XY\n")
+            shell.send("xxxx\n")
+            sleep(0.5)
+            shell.send("xxxx\n")
+            sleep(0.5)
+            shell.send(f"set interface eth1-xx state off\n")
             sleep(1)
-            shell.send(f"set interface XY state off\n")
-            sleep(1)
-            shell.send("show interface XY\n")
+            shell.send("show interface eth1-xx\n")
             sleep(1)
 
             if shell.recv_ready:
                 recv = shell.recv(2048).decode()
+            ssh.close()
         elif state1 == "off" and state2 == "down":
-            shell.send("XY\n")
-            sleep(1)
-            shell.send(f"set interface XY state on\n")
-            sleep(4) # longer time for the interface to go back up
-            shell.send("show interface XY\n")
+            shell.send("clish\n")
+            sleep(0.5)
+            shell.send("lock database override\n")
+            sleep(0.5)
+            shell.send(f"set interface eth1-01 state on\n")
+            sleep(5) # longer time for the interface to go back up
+            shell.send("show interface eth1-01\n")
             sleep(1)
 
             if shell.recv_ready:
                 recv = shell.recv(2048).decode()
+            ssh.close()
         else:
             print(f"Unable to change interface — {YEL}Please manually verify state{RST}")
             recv = "No output received"
@@ -231,69 +256,34 @@ def flipflop_fw(dev, key1, user1, state1, state2):
     finally:
         ssh.close()
 
-def rtrShow(dev, key2, user2, cableObj, rtrBase, lb="", fw=""): # will need to include checking for multiple notconnec lines
+# compares the output from rtrBase with its own output for differences
+def rtrShow(dev, key2, user2, cableObj, lb_eth_int="", fw_eth_int=""): # will need to include checking for multiple notconnec lines
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(AutoAddPolicy())
 
     try:
-        ssh.connect(f"{dev}.XXXX", username=user2, password=key2)
+        ssh.connect(f"{dev}.XXXX", username=user2, password=key2, banner_timeout=20)
         shell = ssh.invoke_shell()
         sleep(2)
 
         # checks if lb place was filled to determine which show cmd
-        if lb:
-            shell.send(f"show interface ethernet XY status\n") # show specific interface range for lb
+        if lb_eth_int:
+            shell.send(f"show interface ethernet {lb_eth_int} status\n") # show specific interface range for lb
             sleep(2)
             #if shell.recv_ready:
             recv2 = shell.recv(2048).decode()
-            diffs = "".join(set(rtrBase.splitlines()) - set(recv2.splitlines())) # stores the difference on the rtr
 
-            cableObj.store_rtr_port(''.join(findall(r"\d{2}", diffs)[0])) # store disconnected router port string
+            cableObj.store_rtr_port(''.join(findall(r"\bEth1/(\d{2}).*notconnected.*\b", recv2))) # store disconnected router port string
 
-        elif fw:
-            shell.send(f"show interface ethernet XY status\n") # show specific interface range for fw
+        elif fw_eth_int:
+            shell.send(f"show interface ethernet {fw_eth_int} status\n") # show specific interface range for fw
             sleep(2)
             #if shell.recv_ready:
             recv2 = shell.recv(2048).decode()
-            diffs = "".join(set(rtrBase.splitlines()) - set(recv2.splitlines()))
-            cableObj.store_rtr_port(''.join(findall(r"\d{2}", diffs)[0])) # store disconnected router port string
+
+            cableObj.store_rtr_port(''.join(findall(r"\bEth1/(\d{2}).*notconnected.*\b", recv2))) # store disconnected router port string
         else:
             print(f"{RED}rtrShow function error{RST}")
-        
-    except gaierror as e:
-        print(f"\n{CYN}Invalid Host:{RST} {dev}. Resolution failed: {e}")
-        return f"[ERR] {dev}: {e}"
-    except Exception as e:
-        print(f"\n{CYN}General connection failure:{RST} {e}")
-        return f"[ERR] {dev}: {e}"
-    finally:
-        ssh.close()
-
-def rtrBase(dev, key2, user2, lb, fw=""):
-    ssh = SSHClient()
-    ssh.set_missing_host_key_policy(AutoAddPolicy())
-
-    try:
-        ssh.connect(f"{dev}.XXXX", username=user2, password=key2)
-        shell = ssh.invoke_shell()
-        sleep(2)
-
-        # checks if lb place was filled to determine which show cmd
-        if lb:
-            shell.send(f"show interface ethernet XY status\n") # show specific interface range for lb
-            sleep(2)
-            #if shell.recv_ready:
-            recv1 = shell.recv(2048).decode()
-        elif fw:
-            shell.send(f"show interface ethernet XY status\n") # show specific interface range for fw
-            sleep(2)
-            #if shell.recv_ready:
-            recv1 = shell.recv(2048).decode()
-            
-        else:
-            print(f"{RED}rtrShow function error{RST}")
-
-        return recv1
         
     except gaierror as e:
         print(f"\n{CYN}Invalid Host:{RST} {dev}. Resolution failed: {e}")
@@ -311,91 +301,90 @@ def cable1():
     lbs = []
     fws = []
     odd_rtr = ""
-
+    # sorts the odd RTRs into the lbs list
     for i in dev_inst.get_rtr_list():
-        if findall(r"01$",i):
+        if findall(r"^B.*(01$)",i):
             odd_rtr = i
         else:
             print("No odd router provided!")
             return # exits the function if no odd RTRs are provided
-    
+    # sorts the odd LBs into the lbs list
+    print("RTR", odd_rtr)
     for i in dev_inst.get_lb_list():
-        if findall(r"01$|03$|05$",i):
+        if findall(r"^LB.*(01$|03$|05$)",i):
             lbs.append(i)
         else:
             print("No LBs entered.")
-        
+    print(f"LBS: {lbs}")
+    # sorts the odd FWs into the lbs list
     for i in dev_inst.get_fw_list():
-        if findall(r"01$|03$",i):
+        if findall(r"^FW.*(01$|03$)",i):
             fws.append(i)
-            print(fws)
         else:
             print("No FWs entered.")
+    print(f"FWs: {fws}")
     # exits the function if no odd FWs our LBs are provided
     if not lbs and not fws:
         return
 
+    lb, rtr_lb, rtr_fw = menu3()
 
     key1 = getpass(f"{CYN}>>>{RST} Enter the SSH pass for the {YEL}LB{RST}: ")
     key2 = getpass(f"{CYN}>>>{RST} Enter the SSH pass for the {YEL}RTR{RST}: ")
-    user = "xyz"
-    cmd = f"show interface eth 25" # var here, please
+    user = "XXX"
     
     # checks LBs # please put an if statement here for the condition of FWs provided but not LBs
     for dev in lbs:
-        output1 = ssh1(i, key1, user, cmd)
+        output11 = ssh1(dev, key1, user, cmd1=f"show interface eth {lb}")
         cable1 = cable()
-        cable1.store_lb_port("25")
+        cable1.store_lb_port(lb) # may just use the variable directly to pass to the flipflop function
 
-        cable1.store_lb_state("".join(findall(r"protocol is (up|down)", output1))) # stores the LB state
-        print(f"1. {YEL}Initial{RST} LB {CYN}{dev}{RST} state: ", cable1.get_lb_state())
-        rtrBase2 = rtrBase(odd_rtr, key2, user, cable1.get_lb_port(), fw = "") # sends the rtr baseline eth stat output over to router show for comparison
+        cable1.store_lb_state("".join(findall(r"protocol is (up|down)", output11))) # stores the LB state
+        print(f"\n1. Initial LB {CYN}{dev}{RST} state: {RED}{cable1.get_lb_state()}{RST}")
 
-        
         # change the lb state by passing it and its port to the flipflop function
-        output2 = flipflop_lb(dev, key1, user, cable1.get_fw_state1(), cable1.get_fw_state2()) # check if you stored a value for lb port
+        output22 = flipflop_lb(dev, key1, user, cable1.get_lb_state(), lb) # check if you stored a value for lb port
 
         # checks the returned output to from up down to determine if the state flipped
-        cable1.store_lb_state("".join(findall(r"protocol is (up|down)", output2)))
-        print(f"2. {YEL}Automated{RST} LB {CYN}{dev}{RST} state: ", cable1.get_lb_state())
-        
-        rtrShow(odd_rtr, key2, user, cable1, rtrBase2, cable1.get_lb_port(), fw="") # variable user supplied containing lb/fw range
+        cable1.store_lb_state("".join(findall(r"protocol is (up|down)", output22)))
+        print(f"2. Automated LB {CYN}{dev}{RST} state: {RED}{cable1.get_lb_state()}{RST}")
+        sleep(5)
+        rtrShow(odd_rtr, key2, user, cable1, lb_eth_int=rtr_lb) # variable user supplied containing lb/fw range
 
-        output3 = flipflop_lb(dev, key1, user, cable1.get_lb_state(), cable1.get_lb_port()) # restore the port to enable
-        cable1.store_lb_state("".join(findall(r"protocol is (up|down)", output3)))
-        print(f"3. {YEL}Restored{RST} LB {CYN}{dev}{RST} state: ", cable1.get_lb_state())
+        output33 = flipflop_lb(dev, key1, user, cable1.get_lb_state(), lb) # restore the port to enable
+        cable1.store_lb_state("".join(findall(r"line protocol is (up|down)", output33)))
+        print(f"3. Restored LB {CYN}{dev}{RST} state: {RED}{cable1.get_lb_state()}{RST}")
 
-        print(f"{YEL}>>{RST} {dev} Ethernet {cable1.get_lb_port()} is connected to {odd_rtr} Ethernet {cable1.get_rtr_port()}")
+        print(f"{YEL}>> {dev}{RST} Ethernet {GRN}{cable1.get_lb_port()}{RST} is connected to {YEL}{odd_rtr}{RST} Ethernet {GRN}{cable1.get_rtr_port()}{RST}")
 
     for dev in fws:
 
-        cmd1 = "XY"
-        cmd2 = "show interface ethXY"
-        output1 = ssh1(i, key1, user, cmd1, cmd2)
+        cmd1 = "XX"
+        cmd2 = "show interface ethXX"
+        output1 = ssh1(dev, key1, user, cmd1, cmd2)
         cable2 = cable()
-
 
         cable2.store_fw_state1("".join(findall(r"state (on|off)", output1))) # stores the LB state
         cable2.store_fw_state2("".join(findall(r"link-state link (up|down)", output1))) # stores the LB link state
-        print(f"1. {YEL}Initial{RST} FW {CYN}{dev}{RST} state: ", cable2.get_fw_state1(), "and link-state: ", cable2.get_fw_state2())
-        rtrBase2 = rtrBase(odd_rtr, key2, user, lb="", fw = "01") # sends the rtr baseline eth stat output over to router show for comparison
+        print(f"\n1. Initial FW {CYN}{dev}{RST} state: {RED}{cable2.get_fw_state1()}{RST} and link-state: {RED}{cable2.get_fw_state2()}{RST}")
 
         # change the lb state by passing it and its port to the flipflop function
         output2 = flipflop_fw(dev, key1, user, cable2.get_fw_state1(), cable2.get_fw_state2()) # check if you stored a value for lb port
-        
+
         # checks the returned output to from up down to determine if the state flipped
-        cable2.store_fw_state1("".join(findall(r"state (on|off)", output2)[1])) # stores the LB state; including indexing because the output contains state off from the entered command
+        cable2.store_fw_state1("".join(findall(r"state (on|off)\r\nmac-addr", output2))) # stores the LB state; including indexing because the output contains state off from the entered command
         cable2.store_fw_state2("".join(findall(r"link-state link (up|down)", output2))) # stores the LB link state
-        print(f"2. {YEL}Automated{RST} FW {CYN}{dev}{RST} state: ", cable2.get_fw_state1(), "and link-state: ", cable2.get_fw_state2())
+        print(f"2. Automated FW {CYN}{dev}{RST} state: {RED}{cable2.get_fw_state1()}{RST} and link-state: {RED}{cable2.get_fw_state2()}{RST}")
         
-        rtrShow(odd_rtr, key2, user, cable2, rtrBase2, lb="", fw="01") # variable user supplied containing lb/fw range
+        rtrShow(odd_rtr, key2, user, cable2, fw_eth_int=rtr_fw) # variable user supplied containing lb/fw range
 
         output3 = flipflop_fw(dev, key1, user, cable2.get_fw_state1(), cable2.get_fw_state2()) # restore the port to enable
-        cable2.store_fw_state1("".join(findall(r"state (on|off)", output3)[1])) # stores the LB state; including indexing because the output contains state off from the entered command
-        cable2.store_fw_state2("".join(findall(r"link-state link (up|down)", output3))) # stores the LB link state
-        print(f"3. {YEL}Final{RST} FW {CYN}{dev}{RST} state: ", cable2.get_fw_state1(), "and link-state: ", cable2.get_fw_state2())
 
-        print(f"{YEL}>>{RST} {dev} Ethernet 1-01 is connected to {odd_rtr} Ethernet {cable2.get_rtr_port()}")
+        cable2.store_fw_state1("".join(findall(r"state (on|off)\r\nmac-addr", output3))) # stores the LB state; including indexing because the output contains state off from the entered command
+        cable2.store_fw_state2("".join(findall(r"link-state link (up|down)", output3))) # stores the LB link state
+        print(f"3. Final FW {CYN}{dev}{RST} state: {RED}{cable2.get_fw_state1()}{RST} and link-state: {RED}{cable2.get_fw_state2()}{RST}")
+
+        print(f"{YEL}>>{RST} {YEL}{dev}{RST} Ethernet XX is connected to {odd_rtr} Ethernet {cable2.get_rtr_port()}")
 
 
 def main():
