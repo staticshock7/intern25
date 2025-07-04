@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cable Validation Results</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Roboto', sans-serif;
+      background: #f4f4f6;
+      color: #333;
+    }
+    header {
+      background: #E20074;
+      color: white;
+      padding: 20px 40px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    main {
+      max-width: 800px;
+      margin: 40px auto;
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin-top: 0;
+      font-weight: 700;
+    }
+    h2 {
+      border-bottom: 2px solid #E20074;
+      padding-bottom: 5px;
+      margin-top: 30px;
+      font-weight: 600;
+      color: #E20074;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      background: #f9f9fb;
+      margin: 10px 0;
+      padding: 12px 16px;
+      border-left: 4px solid #E20074;
+      border-radius: 4px;
+      font-size: 15px;
+    }
+    a.button {
+      display: inline-block;
+      margin-top: 30px;
+      background: #E20074;
+      color: white;
+      padding: 12px 20px;
+      text-decoration: none;
+      border-radius: 4px;
+      font-weight: 500;
+      transition: background 0.3s ease;
+    }
+    a.button:hover {
+      background: #b8005e;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Cable Validation Results</h1>
+  </header>
+  <main>
+    <h2>Firewalls</h2>
+    {% if fw_results %}
+    <ul>
+      {% for item in fw_results %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>No firewall results were generated.</p>
+    {% endif %}
+
+    <h2>Load Balancers</h2>
+    {% if lb_results %}
+    <ul>
+      {% for item in lb_results %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>No load balancer results were generated.</p>
+    {% endif %}
+
+    <a href="/" class="button">Run Another Validation</a>
+  </main>
+</body>
+</html>
