@@ -71,53 +71,125 @@
       border: 1px dashed #E20074;
       border-radius: 4px;
     }
+  .lds-dual-ring {
+    display: inline-block;
+    width: 64px;
+    height: 64px;
+  }
+  .lds-dual-ring:after {
+    content: " ";
+    display: block;
+    width: 46px;
+    height: 46px;
+    margin: 1px;
+    border-radius: 50%;
+    border: 5px solid #E20074;
+    border-color: #E20074 transparent #E20074 transparent;
+    animation: lds-dual-ring 1.2s linear infinite;
+  }
+  @keyframes lds-dual-ring {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .exit-button {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    text-decoration: none;
+    font-size: 24px;
+    color: #E20074;
+    background: white;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  .exit-button:hover {
+    background: #f9e6f0;
+  }
   </style>
 
-  <script>
-    function toggleManualPorts() {
-      var portConfig = document.getElementById("port_config").value;
-      var manualFields = document.getElementById("manual_ports");
-      manualFields.style.display = (portConfig === "manual") ? "block" : "none";
-    }
-  </script>
 </head>
 <body>
   <header>
     <h1>Cable Validation Portal</h1>
   </header>
+  
   <main>
+    <a href="#" onclick="quitApp()" class="exit-button" id="exitButton" title="Exit">✖</a>
+    <div id="loading-spinner" style="display:none; text-align:center; margin-top:20px;">
+      <div class="lds-dual-ring"></div>
+      <p style="color:#E20074; font-weight:500;">Running cable validation...</p>
+    </div>
+    
     <form method="post">
       <label for="device_input">Device List or File Path:</label>
-      <input type="text" name="device_input" id="device_input" placeholder="e.g., LB0001 FW0001 B01 or C:\path\devices.txt" required>
-
-      <label for="port_config">Port Configuration:</label>
-      <select name="port_config" id="port_config" onchange="toggleManualPorts()">
-        <option value="standard">Standard configuration</option>
-        <option value="manual">Manual entry</option>
-      </select>
-
-      <div class="manual-section" id="manual_ports">
-        <label for="lb_port">LB Port:</label>
-        <input type="text" name="lb_port" id="lb_port" placeholder="e.g., XX">
-
-        <label for="rtr_lb_port">Router-Side LB Port:</label>
-        <input type="text" name="rtr_lb_port" id="rtr_lb_port" placeholder="e.g., 1/XX-XX">
-
-        <label for="rtr_fw_port">Router-Side FW Port:</label>
-        <input type="text" name="rtr_fw_port" id="rtr_fw_port" placeholder="e.g., 1/XX-XX">
-      </div>
+      <input type="text" name="device_input" id="device_input" placeholder="e.g., LBEPOL4200 FWPOL4202 or C:\path\devices.txt" required>
 
       <label for="username">SSH Username:</label>
       <input type="text" name="username" id="username" required>
 
-      <label for="ssh_pass1">SSH Password 1:</label>
+      <label for="ssh_pass1">SSH Password LB/FW:</label>
       <input type="password" name="ssh_pass1" id="ssh_pass1" required>
 
-      <label for="ssh_pass2">SSH Password 2:</label>
+      <label for="ssh_pass2">SSH Password RTR:</label>
       <input type="password" name="ssh_pass2" id="ssh_pass2" required>
 
       <button type="submit">Run Validation</button>
     </form>
   </main>
+
+<script>
+  const form = document.querySelector("form");
+  const spinner = document.getElementById("loading-spinner");
+  const exitBtn = document.getElementById("exitButton");
+
+  form.addEventListener("submit", function () {
+    spinner.style.display = "block";
+    if (exitBtn) {
+      exitBtn.style.display = "none";
+    }
+  });
+  function quitApp() {
+    fetch('/shutdown', { method: 'POST' })
+      .then(() => {
+        document.body.innerHTML = `
+          <div style="
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            height:100vh;
+            font-family:Roboto, sans-serif;
+            text-align:center;
+            background:#f4f4f6;
+          ">
+            <div style="
+              background:white;
+              padding:40px 60px;
+              border-radius:12px;
+              box-shadow:0 4px 10px rgba(0,0,0,0.1);
+            ">
+              <img src="/static/five.png" alt="High Five Icon" style="height:64px; vertical-align:middle; margin-right:2px;">
+              <h1 style="color:#E20074; font-size:2rem; font-weight:700; margin-bottom:10px;">
+                Program Closed
+              </h1>
+              <p style="font-size:1.1rem; color:#555;">
+                You may now close this tab!
+              </p>
+            </div>
+          </div>
+        `;
+      });
+  }
+</script>
 </body>
+
 </html>
