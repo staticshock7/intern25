@@ -63,6 +63,99 @@
     a.button:hover {
       background: #b8005e;
     }
+
+    .device {
+      color: #E20074; /* T-Mobile primary magenta */
+      font-weight: bold;
+    }
+    .interface {
+      color: #C6007E; /* Darker magenta */
+      font-weight: bold;
+    }
+    .connected-device {
+      color: #FF0090; /* Vibrant magenta */
+      font-weight: bold;
+    }
+    /*Toggle PASS | FAIL*/
+  .toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 8px;
+  }
+
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 80px;
+    height: 30px;
+    font-size: 14px;
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #9e9e9e; /* Neutral grey */
+    transition: .4s;
+    border-radius: 15px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  .slider::after {
+    content: "Pass/Fail";
+  }
+
+  .switch.activated input:checked + .slider {
+    background-color: #4CAF50; /* Green */
+  }
+
+  .switch.activated input:not(:checked) + .slider {
+    background-color: #f44336; /* Red */
+  }
+
+  .switch.activated input:checked + .slider::after {
+    content: "Pass";
+  }
+
+  .switch.activated input:not(:checked) + .slider::after {
+    content: "Fail";
+  }
+
+  .exit-button {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    text-decoration: none;
+    font-size: 24px;
+    color: #E20074;
+    background: white;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  .exit-button:hover {
+    background: #f9e6f0;
+  }
+
   </style>
 </head>
 <body>
@@ -70,11 +163,20 @@
     <h1>Cable Validation Results</h1>
   </header>
   <main>
+    <a href="#" onclick="quitApp()" class="exit-button" title="Exit">✖</a>
     <h2>Firewalls</h2>
     {% if fw_results %}
     <ul>
       {% for item in fw_results %}
-      <li>{{ item }}</li>
+      <li>
+        <div class="toggle-container">
+          <span>{{ item|safe }}</span>
+          <label class="switch">
+            <input type="checkbox" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </li>
       {% endfor %}
     </ul>
     {% else %}
@@ -85,7 +187,16 @@
     {% if lb_results %}
     <ul>
       {% for item in lb_results %}
-      <li>{{ item }}</li>
+      <li>
+        <div class="toggle-container">
+          <span>{{ item|safe }}</span>
+          <label class="switch">
+            <input type="checkbox" checked>
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-label">Pass</span>
+        </div>
+      </li>
       {% endfor %}
     </ul>
     {% else %}
@@ -94,5 +205,51 @@
 
     <a href="/" class="button">Run Another Validation</a>
   </main>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const switches = document.querySelectorAll(".switch");
+
+    switches.forEach(s => {
+      const input = s.querySelector("input");
+      input.addEventListener("change", function () {
+        s.classList.add("activated"); // Activate on first toggle
+      });
+    });
+  });
+  function quitApp() {
+    fetch('/shutdown', { method: 'POST' })
+      .then(() => {
+        document.body.innerHTML = `
+          <div style="
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            height:100vh;
+            font-family:Roboto, sans-serif;
+            text-align:center;
+            background:#f4f4f6;
+          ">
+            <div style="
+              background:white;
+              padding:40px 60px;
+              border-radius:12px;
+              box-shadow:0 4px 10px rgba(0,0,0,0.1);
+            ">
+              <img src="/static/five.png" alt="High Five Icon" style="height:64px; vertical-align:middle; margin-right:2px;">
+              <h1 style="color:#E20074; font-size:2rem; font-weight:700; margin-bottom:10px;">
+                Program Closed
+              </h1>
+              <p style="font-size:1.1rem; color:#555;">
+                You may now close this tab!
+              </p>
+            </div>
+          </div>
+        `;
+      });
+  }
+</script>
 </body>
+
 </html>
