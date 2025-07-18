@@ -6,6 +6,7 @@ Project 1:
     # tested on specific devices, but can be easily modified via layer_2_validation.py to accommodate other systems
   Requirements:
     - a Python venv with Paramiko and Flask insalled
+    - place index.html and results.html in a folder named "template" to accommodate Flask expectations
   Description:
     > launching app.py launches index.html
     > input the device names belonging to a group of expected connected devices
