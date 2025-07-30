@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request
-from layer_2_validation.py import main
+from cable_7 import main
 import webbrowser
 from os import getpid, kill
 from signal import SIGINT
@@ -16,6 +16,7 @@ def index():
 
         device_input = request.form.get("device_input", "").strip()
         username = request.form.get("username", "").strip()
+        user_rtr = request.form.get("user_rtr", "").strip()
         ssh_pass1 = request.form.get("ssh_pass1", "")
         ssh_pass2 = request.form.get("ssh_pass2", "")
 
@@ -25,7 +26,8 @@ def index():
         lb_even, lb_odd, fw_even, fw_odd = main(
             key1=ssh_pass1,
             key2=ssh_pass2,
-            user=username,
+            user1=username,
+            user2=user_rtr,
             device_input=device_input,
         )
 
@@ -38,7 +40,7 @@ def index():
 @app.route('/shutdown', methods=['POST'])
 def shutdown():
     def delayed_shutdown():
-        import time
+        
         sleep(1)
         kill(getpid(), SIGINT)
 
